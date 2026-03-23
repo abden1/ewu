@@ -1,4 +1,4 @@
-import type { WarmupSpeed } from "@/generated/prisma/client";
+import type { WarmupSpeed } from "@prisma/client";
 
 interface DayRange {
   dayStart: number;

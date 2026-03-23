@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["nodemailer", "imapflow"],
-  outputFileTracingIncludes: {
-    "**": ["./src/generated/prisma/**"],
-  },
+  serverExternalPackages: ["nodemailer", "imapflow", "@prisma/client", ".prisma/client"],
 };
 
 export default nextConfig;
