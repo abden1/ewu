@@ -178,6 +178,16 @@ export function AddAccountDialog({ onSuccess }: AddAccountDialogProps) {
                   imap: { ...f.imap, password: e.target.value },
                 }))}
               />
+              {(form.provider === "GMAIL" || form.provider === "YAHOO") && (
+                <div className="mt-2 rounded-lg border border-yellow-600/30 bg-yellow-600/10 px-3 py-2 text-xs text-yellow-300">
+                  <strong>⚠ Do NOT use your regular password.</strong>{" "}
+                  {form.provider === "GMAIL" ? (
+                    <>Generate a 16-character <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Gmail App Password</a> and use that here. Your account must have 2-Step Verification enabled.</>
+                  ) : (
+                    <>Generate a <a href="https://login.yahoo.com/myaccount/security" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Yahoo App Password</a> and use that here.</>
+                  )}
+                </div>
+              )}
             </div>
 
             {form.provider === "CUSTOM" && (
@@ -258,6 +268,18 @@ export function AddAccountDialog({ onSuccess }: AddAccountDialogProps) {
               {testResult.smtp?.error && <p className="text-sm text-muted-foreground">SMTP: {testResult.smtp.error}</p>}
               {testResult.imap?.error && <p className="text-sm text-muted-foreground">IMAP: {testResult.imap.error}</p>}
             </div>
+            {(testResult.smtp?.error?.includes("Application-specific") || testResult.smtp?.error?.includes("534") || testResult.imap?.error?.includes("Application-specific")) && (
+              <div className="rounded-lg border border-yellow-600/30 bg-yellow-600/10 px-3 py-2 text-xs text-yellow-300">
+                <strong>💡 App Password required.</strong>{" "}
+                {form.provider === "GMAIL" ? (
+                  <>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="underline font-semibold">myaccount.google.com/apppasswords</a>, create an App Password, and use that 16-character code instead of your Gmail password.</>
+                ) : form.provider === "YAHOO" ? (
+                  <>Go to <a href="https://login.yahoo.com/myaccount/security" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Yahoo Account Security</a> and generate an App Password.</>
+                ) : (
+                  <>Your email provider requires an App Password instead of your regular password.</>
+                )}
+              </div>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleClose} className="flex-1">Close</Button>
               <Button onClick={() => setStep("credentials")} className="flex-1">Fix Settings</Button>
