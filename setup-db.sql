@@ -34,21 +34,34 @@ CREATE POLICY "domain_own" ON domain_records FOR ALL USING (
 );
 CREATE POLICY "notifs_own" ON notifications FOR ALL USING (auth.uid()::text = "userId");
 
--- Auth trigger: auto-create user + subscription on signup
+-- Auth trigger: explicitly provide all required non-null columns
+-- (Prisma @updatedAt has no DB-level default, must be set manually in raw SQL)
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  INSERT INTO public.users (id, email, name)
-  VALUES (NEW.id::text, NEW.email, NEW.raw_user_meta_data->>'name')
+  INSERT INTO public.users (id, email, name, "createdAt", "updatedAt")
+  VALUES (
+    NEW.id::text,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'name', ''),
+    NOW(),
+    NOW()
+  )
   ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO public.subscriptions (id, "userId", plan, status, "trialEndsAt")
+  INSERT INTO public.subscriptions (
+    id, "userId", plan, status, "maxAccounts",
+    "trialEndsAt", "createdAt", "updatedAt"
+  )
   VALUES (
     gen_random_uuid()::text,
     NEW.id::text,
     'FREE_TRIAL',
     'TRIALING',
-    NOW() + INTERVAL '14 days'
+    1,
+    NOW() + INTERVAL '14 days',
+    NOW(),
+    NOW()
   )
   ON CONFLICT ("userId") DO NOTHING;
 

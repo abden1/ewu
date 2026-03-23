@@ -5,7 +5,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "EWU - Email Warm-Up",
   description: "Automatically warm up your email addresses to improve deliverability and avoid spam folders.",
-  icons: { icon: "/EWU.png" },
+  icons: {
+    icon: [{ url: "/EWU.png", type: "image/png" }],
+    shortcut: "/EWU.png",
+    apple: "/EWU.png",
+  },
   openGraph: {
     title: "EWU - Email Warm-Up",
     description: "Boost your email deliverability with automated warm-up campaigns.",
