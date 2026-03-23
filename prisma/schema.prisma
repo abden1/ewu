@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscription  Subscription?
+  emailAccounts EmailAccount[]
+  campaigns     WarmupCampaign[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 SubscriptionPlan   @default(FREE_TRIAL)
+  status               SubscriptionStatus @default(TRIALING)
+  maxAccounts          Int                @default(1)
+  trialEndsAt          DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  FREE_TRIAL
+  STARTER
+  PRO
+  AGENCY
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+model EmailAccount {
+  id                  String        @id @default(cuid())
+  userId              String
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email               String
+  displayName         String?
+  provider            EmailProvider @default(CUSTOM)
+  smtpConfigEncrypted String
+  imapConfigEncrypted String
+  status              AccountStatus @default(PENDING)
+  reputationScore     Int           @default(50)
+  isInPool            Boolean       @default(false)
+  inPoolSince         DateTime?
+  lastTestedAt        DateTime?
+  lastSmtpError       String?
+  lastImapError       String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  campaigns         WarmupCampaign[]
+  emailLogs         EmailLog[]
+  reputationHistory ReputationSnapshot[]
+  domainRecord      DomainRecord?
+
+  @@unique([userId, email])
+  @@map("email_accounts")
+}
+
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+  YAHOO
+  ZOHO
+  CUSTOM
+}
+
+enum AccountStatus {
+  PENDING
+  CONNECTED
+  ERROR
+  SUSPENDED
+}
+
+model WarmupCampaign {
+  id                 String         @id @default(cuid())
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailAccountId     String
+  emailAccount       EmailAccount   @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  name               String
+  status             CampaignStatus @default(PENDING)
+  speed              WarmupSpeed    @default(MEDIUM)
+  startedAt          DateTime?
+  pausedAt           DateTime?
+  completedAt        DateTime?
+  currentDay         Int            @default(0)
+  totalDayTarget     Int            @default(30)
+  scheduleConfig     Json           @default("{\"timezone\":\"UTC\",\"businessHoursOnly\":true,\"startHour\":8,\"endHour\":18}")
+  templateCategories String[]       @default(["business"])
+  totalSent          Int            @default(0)
+  totalReceived      Int            @default(0)
+  inboxCount         Int            @default(0)
+  spamCount          Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  emailLogs EmailLog[]
+
+  @@map("warmup_campaigns")
+}
+
+enum CampaignStatus {
+  PENDING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ERROR
+}
+
+enum WarmupSpeed {
+  SLOW
+  MEDIUM
+  FAST
+}
+
+model EmailLog {
+  id             String         @id @default(cuid())
+  campaignId     String
+  campaign       WarmupCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  emailAccountId String
+  emailAccount   EmailAccount   @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  direction      EmailDirection
+  fromAddress    String
+  toAddress      String
+  subject        String
+  messageId      String?        @unique
+  threadId       String?
+  sentAt         DateTime?
+  receivedAt     DateTime?
+  openedAt       DateTime?
+  placement      EmailPlacement @default(UNKNOWN)
+  isReply        Boolean        @default(false)
+  replyToLogId   String?
+  error          String?
+  createdAt      DateTime       @default(now())
+
+  @@index([campaignId])
+  @@index([emailAccountId])
+  @@index([sentAt])
+  @@map("email_logs")
+}
+
+enum EmailDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum EmailPlacement {
+  INBOX
+  SPAM
+  UNKNOWN
+}
+
+model ReputationSnapshot {
+  id                 String       @id @default(cuid())
+  emailAccountId     String
+  emailAccount       EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  score              Int
+  inboxPlacementRate Float        @default(0)
+  openRate           Float        @default(0)
+  bounceRate         Float        @default(0)
+  spamRate           Float        @default(0)
+  authScore          Float        @default(0)
+  recordedAt         DateTime     @default(now())
+
+  @@index([emailAccountId, recordedAt])
+  @@map("reputation_snapshots")
+}
+
+model DomainRecord {
+  id              String       @id @default(cuid())
+  emailAccountId  String       @unique
+  emailAccount    EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  domain          String
+  spfRecord       String?
+  spfValid        Boolean      @default(false)
+  dkimRecord      String?
+  dkimValid       Boolean      @default(false)
+  dmarcRecord     String?
+  dmarcValid      Boolean      @default(false)
+  blacklistStatus Json         @default("{}")
+  isBlacklisted   Boolean      @default(false)
+  blacklistedOn   String[]     @default([])
+  lastCheckedAt   DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("domain_records")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  metadata  Json             @default("{}")
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  ACCOUNT_CONNECTED
+  ACCOUNT_ERROR
+  SPAM_DETECTED
+  BLACKLIST_ADDED
+  BLACKLIST_REMOVED
+  CAMPAIGN_COMPLETED
+  CAMPAIGN_ERROR
+  REPUTATION_DROP
+  SUBSCRIPTION_EXPIRING
+  TRIAL_ENDING
+}
